@@ -1,0 +1,24 @@
+{
+  "name": "sonarlint-cli",
+  "version": "0.1.0",
+  "description": "CLI tool that runs SonarLint analysis using the LSP server",
+  "type": "module",
+  "bin": {
+    "sonarlint-cli": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node --enable-source-maps dist/cli.js",
+    "dev": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "vscode-languageserver-protocol": "^3.17.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
