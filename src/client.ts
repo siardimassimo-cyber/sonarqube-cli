@@ -159,7 +159,7 @@ function registerClientHandlers(connection: MessageConnection) {
         analyzerProperties: {},
         disableTelemetry: true,
         rules: {},
-        output: { showVerboseLogs: !!process.env.SONARLINT_DEBUG },
+        output: { showVerboseLogs: true },
       }));
     },
   );
@@ -255,7 +255,7 @@ export async function initializeClient(
       productName: "SonarLint CLI",
       productVersion: "0.1.0",
       firstSecretDetected: false,
-      showVerboseLogs: !!process.env.SONARLINT_DEBUG,
+      showVerboseLogs: true,
       enableNotebooks: false,
       platform: platform(),
       architecture: arch(),
@@ -326,14 +326,9 @@ export async function analyzeFiles(
     (params) => {
       // Only track analysis that includes our files (check for inputFiles in the log)
       if (params.message.includes("Starting analysis with configuration")) {
-        const includesOurFiles = [...targetUris].some((uri) =>
-          params.message.includes(uri),
-        );
-        if (includesOurFiles) {
-          fileAnalysisStarted = true;
-          if (options.verbose) {
-            process.stderr.write(`  [file analysis started]\n`);
-          }
+        fileAnalysisStarted = true;
+        if (options.verbose) {
+          process.stderr.write(`  [file analysis started]\n`);
         }
       }
 
@@ -364,6 +359,18 @@ export async function analyzeFiles(
     },
   );
 
+  // Create the settlement promise before opening files to avoid race conditions
+  // where the server emits completion signals before the callback is registered.
+  const analysisPromise = new Promise<void>((res) => {
+    analysisSettled = res;
+
+    // Hard timeout
+    setTimeout(() => {
+      if (settleTimer) clearTimeout(settleTimer);
+      res();
+    }, timeoutMs);
+  });
+
   // Open all files for analysis
   for (const file of options.files) {
     const absPath = resolve(file);
@@ -382,18 +389,7 @@ export async function analyzeFiles(
   }
 
   // Wait for analysis to complete
-  await new Promise<void>((res) => {
-    analysisSettled = res;
-
-    // Start initial settle timer — will be reset once analysis starts
-    trySettle();
-
-    // Hard timeout
-    setTimeout(() => {
-      if (settleTimer) clearTimeout(settleTimer);
-      res();
-    }, timeoutMs);
-  });
+  await analysisPromise;
 
   // Close files
   for (const file of options.files) {
